@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Warehouse 3D Dashboard - Cloud Sync</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Font Inter & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0f19;
+            color: #f1f5f9;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col overflow-x-hidden antialiased selection:bg-indigo-500 selection:text-white bg-[#0b0f19]">
+
+    <!-- ================= LAYAR LOGIN ================= -->
+    <div id="login-screen" class="min-h-screen flex items-center justify-center p-4 relative z-50">
+        <!-- Efek Glow Background -->
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-600/20 rounded-full blur-[100px] pointer-events-none"></div>
+        
+        <div class="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm relative z-10">
+            <div class="text-center mb-8">
+                <div class="inline-block bg-gradient-to-tr from-indigo-600 to-violet-500 text-white p-3 rounded-xl shadow-lg shadow-indigo-500/30 mb-4">
+                    <i class="fa-solid fa-warehouse text-3xl"></i>
+                </div>
+                <h2 class="text-2xl font-extrabold text-white">NEXUS <span class="text-indigo-400">WMS</span></h2>
+                <p class="text-slate-400 text-xs mt-2">Masuk untuk accessing sistem gudang</p>
+            </div>
+            
+            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-1.5">Username</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500"><i class="fa-solid fa-user"></i></span>
+                        <input type="text" id="login-username" required placeholder="admin1" class="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-1.5">Password</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500"><i class="fa-solid fa-lock"></i></span>
+                        <input type="password" id="login-password" required placeholder="••••••••" class="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition">
+                    </div>
+                </div>
+                
+                <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold transition shadow-lg shadow-indigo-500/20 mt-2 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket"></i> Login ke Sistem
+                </button>
+            </form>
+            
+            <!-- Pesan Error Login -->
+            <div id="login-error" class="hidden mt-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-400 text-xs text-center font-medium">
+                Username atau password salah!
+            </div>
+            
+            <div class="mt-6 border-t border-slate-800 pt-4 text-center">
+                <p class="text-[10px] text-slate-500">Akun demo: admin1 s/d admin5<br>Password sama dengan username</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= DASHBOARD UTAMA ================= -->
+    <div id="dashboard-screen" class="hidden flex-col flex-1 w-full min-h-screen">
+        <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-30">
+            <div class="flex items-center space-x-3">
+                <div class="bg-gradient-to-tr from-indigo-600 to-violet-500 text-white p-2.5 rounded-xl shadow-lg shadow-indigo-500/30">
+                    <i class="fa-solid fa-warehouse text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-extrabold tracking-tight text-white flex items-center gap-2">
+                        NEXUS <span class="text-xs bg-indigo-500/20 text-indigo-400 font-semibold px-2 py-0.5 rounded border border-indigo-500/30">WMS CLOUD</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Sistem Manajemen &amp; Visualisasi Gudang Multi-Device</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-4">
+                <!-- Sync Status Badge -->
+                <div id="sync-status" class="flex items-center space-x-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs px-3 py-1.5 rounded-full" 
+                     title="Menghubungkan ke Cloud Database Supabase untuk sinkronisasi multi-device.">
+                    <span id="sync-dot" class="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span>
+                    <span id="sync-text" class="font-medium">Cloud Offline (Lokal)</span>
+                </div>
+                
+                <div class="h-8 w-px bg-slate-800"></div>
+                
+                <div class="flex items-center space-x-2">
+                    <div class="h-9 w-9 bg-slate-800 rounded-full flex items-center justify-center text-indigo-400 border border-slate-700">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <div class="hidden sm:block text-left">
+                        <p id="display-username" class="text-xs font-semibold text-slate-200 uppercase">Global Admin</p>
+                        <p class="text-[10px] text-slate-400">Database Synced</p>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 flex flex-col md:flex-row">
+            <aside class="w-full md:w-64 bg-slate-900/40 border-r border-slate-800 p-4 flex flex-col gap-2">
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-1">Menu Utama</p>
+                
+                <button id="btn-dashboard" onclick="switchTab('dashboard')" class="tab-btn w-full flex items-center space-x-3 px-3 py-3 rounded-xl transition duration-200 bg-indigo-600/10 text-indigo-400 border border-indigo-600/20">
+                    <i class="fa-solid fa-chart-pie text-lg w-5"></i>
+                    <span class="text-sm font-medium">Dashboard Real-Time</span>
+                </button>
+                
+                <button id="btn-warehouse3d" onclick="switchTab('warehouse3d')" class="tab-btn w-full flex items-center space-x-3 px-3 py-3 rounded-xl transition duration-200 text-slate-400 hover:bg-slate-800 hover:text-slate-100">
+                    <i class="fa-solid fa-cubes text-lg w-5"></i>
+                    <span class="text-sm font-medium">Visualisasi Layout 3D</span>
+                </button>
+                
+                <button id="btn-crud" onclick="switchTab('crud')" class="tab-btn w-full flex items-center space-x-3 px-3 py-3 rounded-xl transition duration-200 text-slate-400 hover:bg-slate-800 hover:text-slate-100">
+                    <i class="fa-solid fa-boxes-stacked text-lg w-5"></i>
+                    <span class="text-sm font-medium">Kelola Stok (CRUD)</span>
+                </button>
+
+                <button id="btn-config" onclick="switchTab('config')" class="tab-btn w-full flex items-center space-x-3 px-3 py-3 rounded-xl transition duration-200 text-slate-400 hover:bg-slate-800 hover:text-slate-100">
+                    <i class="fa-solid fa-database text-lg w-5"></i>
+                    <span class="text-sm font-medium">Pengaturan Cloud Database</span>
+                </button>
+
+                <div class="mt-6 border-t border-slate-850 pt-4">
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">Panduan Lokasi Rak</p>
+                    <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 text-xs space-y-2 text-slate-400">
+                        <p class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-indigo-500 inline-block"></span> Row/Baris: 1 - 4</p>
+                        <p class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block"></span> Col/Kolom: 1 - 5</p>
+                        <p class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block"></span> Level/Lantai: 1 - 3</p>
+                    </div>
+                </div>
+
+                <!-- Cloud Notice -->
+                <div id="notice-box" class="mt-auto bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 text-[11px] text-amber-300">
+                    <h4 class="font-bold flex items-center gap-1 mb-1"><i class="fa-solid fa-triangle-exclamation"></i> Sinkronisasi Offline</h4>
+                    <p class="leading-relaxed">Data saat ini tersimpan lokal. Buka tab <strong>Pengaturan Cloud Database</strong> untuk mengaktifkan sinkronisasi antar HP &amp; Laptop.</p>
+                </div>
+            </aside>
+
+            <main class="flex-1 p-6 overflow-y-auto relative">
+                
+                <div id="toast-container" class="fixed top-24 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+                <!-- ================= TAB: DASHBOARD REALTIME ================= -->
+                <section id="tab-content-dashboard" class="tab-pane space-y-6">
+                    <!-- Ringkasan Statistik Utama -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl flex items-center space-x-4 shadow-xl">
+                            <div class="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl">
+                                <i class="fa-solid fa-boxes-stacked text-2xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-400 font-medium">Total Item Terdaftar</p>
+                                <h3 id="stat-total-items" class="text-2xl font-bold mt-1">0</h3>
+                            </div>
+                        </div>
+                        <div class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl flex items-center space-x-4 shadow-xl">
+                            <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl">
+                                <i class="fa-solid fa-chart-simple text-2xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-400 font-medium">Utilitas Kapasitas Rak</p>
+                                <h3 id="stat-capacity-usage" class="text-2xl font-bold mt-1">0%</h3>
+                            </div>
+                        </div>
+                        <div class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl flex items-center space-x-4 shadow-xl">
+                            <div class="p-3 bg-amber-500/10 text-amber-400 rounded-xl">
+                                <i class="fa-solid fa-triangle-exclamation text-2xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-400 font-medium">Stok Menipis / Kritis</p>
+                                <h3 id="stat-low-stock" class="text-2xl font-bold text-amber-400 mt-1">0</h3>
+                            </div>
+                        </div>
+                        <div class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl flex items-center space-x-4 shadow-xl">
+                            <div class="p-3 bg-purple-500/10 text-purple-400 rounded-xl">
+                                <i class="fa-solid fa-sack-dollar text-2xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-400 font-medium">Estimasi Nilai Aset</p>
+                                <h3 id="stat-total-value" class="text-2xl font-bold mt-1">Rp 0</h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl lg:col-span-2 flex flex-col">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <h4 class="text-base font-bold text-white">Live Monitoring Gudang (Layout 3D)</h4>
+                                    <p class="text-xs text-slate-400">Klik dan seret di area untuk merotasi sudut pandang kamera 3D</p>
+                                </div>
+                                <button onclick="switchTab('warehouse3d')" class="text-xs text-indigo-400 font-semibold hover:underline flex items-center gap-1">
+                                    Layar Penuh <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                                </button>
+                            </div>
+                            <div class="bg-slate-950 rounded-xl overflow-hidden border border-slate-850 h-[300px] relative">
+                                <div id="threejs-container-dashboard" class="w-full h-full"></div>
+                                <div class="absolute bottom-3 left-3 bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-lg text-[11px] text-slate-300 pointer-events-none flex items-center gap-1.5">
+                                    <span class="h-2 w-2 rounded-full bg-indigo-500"></span> Live Viewer 3D Terkoneksi
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col h-[384px]">
+                            <h4 class="text-base font-bold text-white mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-circle-exclamation text-amber-500"></i> Peringatan Stok
+                            </h4>
+                            <div id="dashboard-stock-alerts" class="space-y-3 flex-1 overflow-y-auto pr-1">
+                                <div class="text-center py-8 text-slate-500 text-xs">Mengambil informasi kondisi stok...</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ================= TAB: VISUALISASI LAYOUT 3D ================= -->
+                <section id="tab-content-warehouse3d" class="tab-pane hidden space-y-6">
+                    <div class="flex flex-col xl:flex-row gap-6">
+                        <div class="flex-1 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl relative">
+                            <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                                <div>
+                                    <h3 class="text-lg font-bold text-white">Interactive 3D Warehouse Map</h3>
+                                    <p class="text-xs text-slate-400">Gunakan drag untuk putar, klik kanan/drag untuk geser (pan), dan scroll untuk zoom.</p>
+                                </div>
+                                <div class="flex items-center space-x-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+                                    <button onclick="set3DFilter('all')" class="filter-3d-btn px-3 py-1 text-xs font-semibold rounded-lg bg-indigo-600 text-white shadow">Semua</button>
+                                    <button onclick="set3DFilter('low')" class="filter-3d-btn px-3 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200">Stok Kritis</button>
+                                    <button onclick="set3DFilter('category')" class="filter-3d-btn px-3 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200">Kategori</button>
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-950 rounded-xl overflow-hidden border border-slate-850 h-[500px] relative">
+                                <div id="threejs-main-canvas" class="w-full h-full"></div>
+                                
+                                <div class="absolute top-4 left-4 bg-slate-900/95 border border-slate-800 p-4 rounded-xl space-y-2.5 text-xs shadow-2xl pointer-events-none">
+                                    <h5 class="font-bold text-slate-300 border-b border-slate-800 pb-1.5">Keterangan Kotak:</h5>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="w-3.5 h-3.5 rounded-sm bg-emerald-500 inline-block border border-emerald-400/30"></span>
+                                        <span class="text-slate-300">Stok Aman (&gt; 212.263 unit)</span>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="w-3.5 h-3.5 rounded-sm bg-amber-500 inline-block border border-amber-400/30"></span>
+                                        <span class="text-slate-300">Stok Kritis (&lt; 212.263 unit)</span>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="w-3.5 h-3.5 rounded-sm bg-rose-500 inline-block border border-rose-400/30"></span>
+                                        <span class="text-slate-300">Stok Habis (0 unit)</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="absolute bottom-4 left-4 bg-slate-900/90 border border-slate-800/80 px-3 py-2 rounded-lg text-xs text-slate-300 pointer-events-none">
+                                    <i class="fa-solid fa-hand-pointer text-indigo-400 mr-1 animate-bounce"></i> Klik kotak barang di rak untuk melihat detail item.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="w-full xl:w-80 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+                            <div>
+                                <h3 class="text-base font-bold text-white mb-3 flex items-center gap-2 border-b border-slate-800 pb-3">
+                                    <i class="fa-solid fa-circle-info text-indigo-400"></i> Detail Slot Terpilih
+                                </h3>
+                                <div id="selected-rack-info" class="space-y-4">
+                                    <div class="text-center py-12 text-slate-500 text-xs">
+                                        <i class="fa-solid fa-cubes text-4xl mb-3 text-slate-700 block"></i>
+                                        Silakan klik salah satu kotak kargo di area 3D untuk memunculkan detail barang di panel ini.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ================= TAB: INVENTORY CRUD TABLE ================= -->
+                <section id="tab-content-crud" class="tab-pane hidden space-y-6">
+                    <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+                        <div class="relative flex-1 max-w-md">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                            </span>
+                            <input id="search-input" oninput="filterItems()" type="text" placeholder="Cari SKU, nama barang, atau kategori..." class="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all placeholder:text-slate-500">
+                        </div>
+
+                        <div class="flex items-center space-x-3">
+                            <select id="filter-category-select" onchange="filterItems()" class="bg-slate-900 border border-slate-800 px-3 py-2.5 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer">
+                                <option value="all">Semua Kategori</option>
+                            </select>
+                            <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm px-4 py-2.5 rounded-xl transition shadow-lg shadow-indigo-500/10 flex items-center gap-2">
+                                <i class="fa-solid fa-plus text-xs"></i> Tambah Barang
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-950/60 text-slate-300 font-semibold border-b border-slate-800/80">
+                                        <th class="px-6 py-4">SKU / Kode</th>
+                                        <th class="px-6 py-4">Nama Produk</th>
+                                        <th class="px-6 py-4">Kategori</th>
+                                        <th class="px-6 py-4">Lokasi Rak</th>
+                                        <th class="px-6 py-4 text-center">Masuk / Keluar</th>
+                                        <th class="px-6 py-4 text-center">Sisa Stok</th>
+                                        <th class="px-6 py-4 text-right">Harga Beli</th>
+                                        <th class="px-6 py-4 text-right">Harga Jual</th>
+                                        <th class="px-6 py-4 text-right">Profit / Unit</th>
+                                        <th class="px-6 py-4 text-center">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inventory-table-body" class="divide-y divide-slate-800/50">
+                                    <!-- Diisi via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="table-empty-state" class="hidden py-16 text-center text-slate-500">
+                            <i class="fa-regular fa-folder-open text-4xl mb-2 text-slate-700 block"></i>
+                            Tidak ada data stok barang ditemukan.
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ================= TAB: CONFIGURATION / SETTING CLOUD ================= -->
+                <section id="tab-content-config" class="tab-pane hidden space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                            <h3 class="text-base font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+                                <i class="fa-solid fa-cloud text-indigo-400"></i> Pengaturan Cloud Database
+                            </h3>
+                            <p class="text-xs text-slate-400 leading-relaxed">
+                                Masukkan kredensial Supabase Anda di bawah ini untuk menyambungkan aplikasi ke server database cloud, sehingga data tersinkronisasi secara otomatis antar handphone, tablet, dan laptop.
+                            </p>
+                            
+                            <div class="space-y-3 pt-2">
+                                <div>
+                                    <label class="block text-xs text-slate-300 font-semibold mb-1">Supabase URL</label>
+                                    <input type="text" id="db-url" placeholder="https://fpykekkdjocmpaklypwx.supabase.co" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-300 font-semibold mb-1">Supabase Anon Key</label>
+                                    <input type="password" id="db-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                                </div>
+                            </div>
+
+                            <div class="flex gap-2 pt-2">
+                                <button onclick="saveCloudConfig()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs px-4 py-2 rounded-xl transition shadow">
+                                    <i class="fa-solid fa-floppy-disk mr-1"></i> Hubungkan Database
+                                </button>
+                                <button onclick="disconnectCloud()" class="bg-slate-800 hover:bg-slate-750 text-slate-300 font-semibold text-xs px-4 py-2 rounded-xl transition">
+                                    Putus Hubungan
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                            <h3 class="text-base font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+                                <i class="fa-solid fa-gears text-indigo-400"></i> Kontrol Data Cadangan
+                            </h3>
+                            <p class="text-xs text-slate-400 leading-relaxed">
+                                Jika Anda menggunakan mode lokal (offline), data disimpan di memori browser perangkat ini saja. Anda dapat mereset data ke setelan demo awal pabrikan atau menghapus semuanya.
+                            </p>
+                            <div class="flex flex-wrap gap-2 pt-2">
+                                <button onclick="resetToDemoData()" class="bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs px-4 py-2 rounded-xl transition shadow">
+                                    <i class="fa-solid fa-arrows-rotate mr-1"></i> Data Demo
+                                </button>
+                                <button onclick="clearAllData()" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs px-4 py-2 rounded-xl transition shadow">
+                                    <i class="fa-solid fa-trash mr-1"></i> Bersihkan Semua
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- ================= MODERN MODAL FORM (BARANG MASUK / KELUAR) ================= -->
+    <div id="item-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300">
+            <div class="bg-slate-950/60 px-6 py-4 border-b border-slate-800/80 flex items-center justify-between">
+                <h3 id="modal-title" class="text-base font-bold text-white">Tambah Data Barang</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white p-1 rounded-lg transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <form id="item-form" onsubmit="handleFormSubmit(event)" class="p-6 space-y-4">
+                <input type="hidden" id="form-id" name="id">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="form-sku" class="block text-xs font-semibold text-slate-300 mb-1.5">SKU / Kode Unik Barang <span class="text-rose-500">*</span></label>
+                        <input type="text" id="form-sku" name="sku" required placeholder="Contoh: SKU-011" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label for="form-name" class="block text-xs font-semibold text-slate-300 mb-1.5">Nama Produk <span class="text-rose-500">*</span></label>
+                        <input type="text" id="form-name" name="name" required placeholder="Nama item barang" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="form-category" class="block text-xs font-semibold text-slate-300 mb-1.5">Kategori Barang <span class="text-rose-500">*</span></label>
+                        <input type="text" id="form-category" name="category" required placeholder="Ketik kategori" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label for="form-price" class="block text-xs font-semibold text-slate-300 mb-1.5">Harga Beli / Satuan (Rp) <span class="text-rose-500">*</span></label>
+                        <input type="number" id="form-price" name="price" required min="0" placeholder="0" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label for="form-price-sell" class="block text-xs font-semibold text-slate-300 mb-1.5">Harga Jual (Rp) <span class="text-rose-500">*</span></label>
+                        <input type="number" id="form-price-sell" name="price_sell" required min="0" placeholder="0" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition">
+                    </div>
+                </div>
+
+                <!-- SPLIT BARANG MASUK & KELUAR & MINIMUM -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-950/40 p-3 rounded-xl border border-slate-850">
+                    <div>
+                        <label for="form-in" class="block text-xs font-semibold text-slate-400 mb-1.5">Barang Masuk <span class="text-rose-500">*</span></label>
+                        <input type="number" id="form-in" name="in_stock" required min="0" oninput="calculateLiveStock()" placeholder="0" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label for="form-out" class="block text-xs font-semibold text-slate-400 mb-1.5">Barang Keluar <span class="text-rose-500">*</span></label>
+                        <input type="number" id="form-out" name="out_stock" required min="0" oninput="calculateLiveStock()" placeholder="0" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label for="form-min-stock" class="block text-xs font-semibold text-slate-400 mb-1.5">Batas Min Stok <span class="text-rose-500">*</span></label>
+                        <input type="number" id="form-min-stock" name="min_stock" required min="0" placeholder="212263" value="212263" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition">
+                    </div>
+                </div>
+
+                <!-- LIVE PREVIEW HASIL HITUNG SISA STOK -->
+                <div class="text-right px-2">
+                    <p class="text-xs text-slate-400">Estimasi Sisa Stok Akhir: <span id="live-stock-preview" class="font-bold text-indigo-400">0</span> unit</p>
+                </div>
+
+                <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-4">
+                    <p class="text-[11px] font-bold text-indigo-400 uppercase tracking-wider mb-2.5 flex items-center gap-1">
+                        <i class="fa-solid fa-location-crosshairs"></i> Alokasi Posisi Rak Gudang 3D
+                    </p>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <label for="form-rack-row" class="block text-[11px] text-slate-400 mb-1">Row (1 - 4)</label>
+                            <select id="form-rack-row" name="rack_row" required class="w-full px-2 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none">
+                                <option value="1">Baris 1</option>
+                                <option value="2">Baris 2</option>
+                                <option value="3">Baris 3</option>
+                                <option value="4">Baris 4</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="form-rack-col" class="block text-[11px] text-slate-400 mb-1">Column (1 - 5)</label>
+                            <select id="form-rack-col" name="rack_col" required class="w-full px-2 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none">
+                                <option value="1">Kolom 1</option>
+                                <option value="2">Kolom 2</option>
+                                <option value="3">Kolom 3</option>
+                                <option value="4">Kolom 4</option>
+                                <option value="5">Kolom 5</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="form-rack-level" class="block text-[11px] text-slate-400 mb-1">Level (1 - 3)</label>
+                            <select id="form-rack-level" name="rack_level" required class="w-full px-2 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none">
+                                <option value="1">Lantai 1</option>
+                                <option value="2">Lantai 2</option>
+                                <option value="3">Lantai 3</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4 border-t border-slate-800/80">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-850 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold transition">Batal</button>
+                    <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition shadow-lg shadow-indigo-500/10">Simpan Barang</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl p-6 text-center">
+            <div class="w-12 h-12 bg-rose-500/10 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-rose-500/20">
+                <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+            </div>
+            <h3 class="text-base font-bold text-white mb-2">Konfirmasi Tindakan</h3>
+            <p id="confirm-message" class="text-xs text-slate-400 leading-relaxed mb-6">Apakah Anda yakin ingin melakukan tindakan ini?</p>
+            <div class="flex justify-center space-x-3">
+                <button id="confirm-cancel-btn" class="px-4 py-2 bg-slate-850 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold transition">Batal</button>
+                <button id="confirm-ok-btn" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold transition">Ya, Lanjutkan</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ================= CONFIG & API UTILITIES =================
+        const DEFAULT_SUPABASE_URL = "https://fpykekkdjocmpaklypwx.supabase.co"; 
+        const DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZweWtla2tkam9jbXBha2x5cHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2MTQwMjQsImV4cCI6MjA5ODE5MDAyNH0.eWDACXjSwHN1XK035A_5ZSEL18iNBsTpUZMcDogQYkM"; 
+
+        // Data Demo dengan format nilai besar (> 212.263) serta default price_sell
+        const defaultInventory = [
+            {id: 1, sku: 'SKU-019', name: 'insulatorz9y', category: 'bahanbaku', in_stock: 250000, out_stock: 0, quantity: 250000, min_stock: 212263, rack_row: 1, rack_col: 2, rack_level: 2, price: 3583.00, price_sell: 5000.00},
+            {id: 2, sku: 'SKU-002', name: 'Lampu LED Panel', category: 'Elektronik', in_stock: 300000, out_stock: 120000, quantity: 180000, min_stock: 212263, rack_row: 1, rack_col: 1, rack_level: 2, price: 85000.00, price_sell: 110000.00},
+            {id: 3, sku: 'SKU-003', name: 'Kabel Roll Tembaga', category: 'Elektrikal', in_stock: 0, out_stock: 0, quantity: 0, min_stock: 212263, rack_row: 1, rack_col: 3, rack_level: 1, price: 450000.00, price_sell: 550000.00}
+        ];
+
+        let inventory = [];
+        let currentTab = 'dashboard';
+        let filter3DMode = 'all'; 
+
+        let supabaseClient = null;
+        let isUsingCloud = false;
+
+        let activeScene, activeCamera, activeRenderer, activeControls;
+        let dbScene, dbCamera, dbRenderer, dbControls;
+        const boxesMap = new Map(); 
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        // ================= SECURITY LOGIN UTILITIES =================
+        function handleLogin(event) {
+            event.preventDefault();
+            
+            const user = document.getElementById('login-username').value.trim();
+            const pass = document.getElementById('login-password').value.trim();
+            const errorDiv = document.getElementById('login-error');
+            
+            const validUsers = ['admin1', 'admin2', 'admin3', 'admin4', 'admin5'];
+
+            if (validUsers.includes(user) && pass === user) {
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('dashboard-screen').classList.remove('hidden');
+                document.getElementById('dashboard-screen').classList.add('flex');
+                
+                errorDiv.classList.add('hidden');
+                
+                const nameDisplay = document.getElementById('display-username');
+                if(nameDisplay) nameDisplay.innerText = user;
+
+                initDatabaseConnection();
+                loadData();
+                
+                setTimeout(() => {
+                    init3D('threejs-container-dashboard', 'db');
+                    window.dispatchEvent(new Event('resize')); 
+                }, 50);
+
+                showToast(`Selamat datang kembali, ${user}!`, 'success');
+            } else {
+                errorDiv.classList.remove('hidden');
+                const formDiv = document.querySelector('#login-screen > div');
+                formDiv.classList.add('animate-pulse');
+                setTimeout(() => formDiv.classList.remove('animate-pulse'), 500);
+            }
+        }
+
+        window.onload = function() {
+            window.addEventListener('resize', () => {
+                if (dbRenderer && dbCamera) {
+                    const container = document.getElementById('threejs-container-dashboard');
+                    if (container.clientWidth > 0) {
+                        dbCamera.aspect = container.clientWidth / container.clientHeight;
+                        dbCamera.updateProjectionMatrix();
+                        dbRenderer.setSize(container.clientWidth, container.clientHeight);
+                    }
+                }
+                if (activeRenderer && activeCamera) {
+                    const container = document.getElementById('threejs-main-canvas');
+                    if (container.clientWidth > 0) {
+                        activeCamera.aspect = container.clientWidth / container.clientHeight;
+                        activeCamera.updateProjectionMatrix();
+                        activeRenderer.setSize(container.clientWidth, container.clientHeight);
+                    }
+                }
+            });
+        };
+
+        function initDatabaseConnection() {
+            let savedUrl = localStorage.getItem('supabase_url') || DEFAULT_SUPABASE_URL;
+            let savedKey = localStorage.getItem('supabase_key') || DEFAULT_SUPABASE_KEY;
+
+            document.getElementById('db-url').value = savedUrl;
+            document.getElementById('db-key').value = savedKey;
+
+            if (savedUrl && savedKey && savedKey !== "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZweWtla2tkam9jbXBha2x5cHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2MTQwMjQsImV4cCI6MjA5ODE5MDAyNH0.eWDACXjSwHN1XK035A_5ZSEL18iNBsTpUZMcDogQYkM") {
+                try {
+                    supabaseClient = window.supabase.createClient(savedUrl, savedKey);
+                    isUsingCloud = true;
+                } catch (e) {
+                    isUsingCloud = false;
+                    updateSyncUI(false, "Cloud Error / local");
+                }
+            } else {
+                isUsingCloud = false;
+                updateSyncUI(false, "Cloud Offline (Lokal)");
+            }
+        }
+
+        function updateSyncUI(connected, message) {
+            const dot = document.getElementById('sync-dot');
+            const txt = document.getElementById('sync-text');
+            const badge = document.getElementById('sync-status');
+            const notice = document.getElementById('notice-box');
+
+            if (connected) {
+                dot.className = "h-2 w-2 rounded-full bg-emerald-400 animate-pulse";
+                badge.className = "flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs px-3 py-1.5 rounded-full";
+                txt.innerText = message;
+                if (notice) {
+                    notice.className = "mt-auto bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3 text-[11px] text-emerald-300";
+                    notice.innerHTML = `<h4 class="font-bold flex items-center gap-1 mb-1"><i class="fa-solid fa-cloud"></i> Sinkronisasi Aktif</h4><p class="leading-relaxed">Data Anda tersimpan secara online. Akses dari HP / Laptop Anda akan tersinkron otomatis!</p>`;
+                }
+            } else {
+                dot.className = "h-2 w-2 rounded-full bg-amber-400 animate-pulse";
+                badge.className = "flex items-center space-x-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs px-3 py-1.5 rounded-full";
+                txt.innerText = message;
+                if (notice) {
+                    notice.className = "mt-auto bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 text-[11px] text-amber-300";
+                    notice.innerHTML = `<h4 class="font-bold flex items-center gap-1 mb-1"><i class="fa-solid fa-triangle-exclamation"></i> Sinkronisasi Offline</h4><p class="leading-relaxed">Data saat ini tersimpan lokal. Buka tab <strong>Pengaturan Cloud Database</strong> untuk mengaktifkan sinkronisasi antar HP &amp; Laptop.</p>`;
+                }
+            }
+        }
+
+        async function loadData() {
+            if (isUsingCloud && supabaseClient) {
+                try {
+                    let { data: items, error } = await supabaseClient.from('inventory_items').select('*').order('id', { ascending: true });
+                    if (error) throw error;
+                    inventory = items || [];
+                    updateSyncUI(true, "Cloud Database Synced");
+                } catch (e) {
+                    console.error("Kesalahan sinkronisasi database cloud:", e);
+                    showToast("Gagal sync cloud. Menggunakan data lokal.", "error");
+                    isUsingCloud = false;
+                    updateSyncUI(false, "Cloud Error (Lokal)");
+                    loadLocalFallback();
+                }
+            } else {
+                loadLocalFallback();
+                updateSyncUI(false, "Cloud Offline (Lokal)");
+            }
+            
+            updateDashboardUI();
+            updateTableUI();
+            populateCategoryFilter();
+            sync3DVisualization();
+        }
+
+        function loadLocalFallback() {
+            if (!localStorage.getItem('nexus_items')) {
+                localStorage.setItem('nexus_items', JSON.stringify(defaultInventory));
+            }
+            inventory = JSON.parse(localStorage.getItem('nexus_items')) || [];
+        }
+
+        // Hitung live sisa stok saat mengetik di modal form
+        function calculateLiveStock() {
+            const inVal = parseInt(document.getElementById('form-in').value) || 0;
+            const outVal = parseInt(document.getElementById('form-out').value) || 0;
+            const res = inVal - outVal;
+            document.getElementById('live-stock-preview').innerText = res.toLocaleString('id-ID');
+        }
+
+        async function handleFormSubmit(event) {
+            event.preventDefault();
+            const form = document.getElementById('item-form');
+            const formData = new FormData(form);
+
+            const row = parseInt(formData.get('rack_row'));
+            const col = parseInt(formData.get('rack_col'));
+            const level = parseInt(formData.get('rack_level'));
+            const idVal = formData.get('id');
+
+            const sku = formData.get('sku');
+            const name = formData.get('name');
+            const category = formData.get('category');
+            const in_stock = parseInt(formData.get('in_stock')) || 0;
+            const out_stock = parseInt(formData.get('out_stock')) || 0;
+            const min_stock = parseInt(formData.get('min_stock')) || 0;
+            const price = parseFloat(formData.get('price')) || 0;
+            const price_sell = parseFloat(formData.get('price_sell')) || 0;
+            
+            // Kalkulasi sisa stok otomatis (Masuk - Keluar)
+            const quantity = in_stock - out_stock;
+            const profit = (price_sell - price) * quantity;
+
+            // Validasi Tabrakan Rak kargo
+            const bentrok = inventory.find(item => item.rack_row === row && item.rack_col === col && item.rack_level === level && String(item.id) !== String(idVal));
+            if (bentrok) {
+                showToast(`Gagal! Rak [Baris ${row}, Kolom ${col}, Lantai ${level}] sudah terisi oleh '${bentrok.name}'`, 'error');
+                return;
+            }
+
+            const payloadData = { sku, name, category, in_stock, out_stock, min_stock, rack_row: row, rack_col: col, rack_level: level, price, price_sell };
+
+            if (isUsingCloud && supabaseClient) {
+                try {
+                    if (idVal) {
+                        let { error } = await supabaseClient.from('inventory_items').update(payloadData).eq('id', idVal);
+                        if (error) throw error;
+                        showToast('Barang Cloud berhasil diperbarui!', 'success');
+                    } else {
+                        let { error } = await supabaseClient.from('inventory_items').insert([payloadData]);
+                        if (error) throw error;
+                        showToast('Barang Cloud berhasil ditambahkan!', 'success');
+                    }
+                } catch (e) {
+                    showToast("Kesalahan Cloud Database: " + e.message, "error");
+                    return;
+                }
+            } else {
+                const items = [...inventory];
+                if (idVal) {
+                    const idx = items.findIndex(item => String(item.id) === String(idVal));
+                    if (idx !== -1) {
+                        items[idx] = { id: parseInt(idVal), ...payloadData };
+                        showToast('Data barang lokal diperbarui!', 'success');
+                    }
+                } else {
+                    const newId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
+                    items.push({ id: newId, ...payloadData });
+                    showToast('Barang lokal berhasil ditambahkan!', 'success');
+                }
+                localStorage.setItem('nexus_items', JSON.stringify(items));
+            }
+
+            closeModal();
+            loadData();
+        }
+
+        async function deleteItem(id, name) {
+            openConfirm(`Apakah Anda yakin ingin menghapus "<strong>${name}</strong>"?`, async () => {
+                if (isUsingCloud && supabaseClient) {
+                    try {
+                        let { error } = await supabaseClient.from('inventory_items').delete().eq('id', id);
+                        if (error) throw error;
+                        showToast('Barang Cloud berhasil dihapus!', 'success');
+                    } catch (e) {
+                        showToast("Gagal menghapus data di Cloud.", "error");
+                        return;
+                    }
+                } else {
+                    let items = JSON.parse(localStorage.getItem('nexus_items')) || [];
+                    items = items.filter(item => String(item.id) !== String(id));
+                    localStorage.setItem('nexus_items', JSON.stringify(items));
+                    showToast('Barang lokal berhasil dihapus!', 'success');
+                }
+                loadData();
+            });
+        }
+
+        function saveCloudConfig() {
+            const url = document.getElementById('db-url').value.trim();
+            const key = document.getElementById('db-key').value.trim();
+
+            if (!url || !key) {
+                showToast("URL dan Key harus diisi!", "warning");
+                return;
+            }
+
+            localStorage.setItem('supabase_url', url);
+            localStorage.setItem('supabase_key', key);
+            showToast("Konfigurasi disimpan. Mencoba menyambungkan...", "success");
+
+            initDatabaseConnection();
+            loadData();
+        }
+
+        function disconnectCloud() {
+            localStorage.removeItem('supabase_url');
+            localStorage.removeItem('supabase_key');
+            document.getElementById('db-url').value = "";
+            document.getElementById('db-key').value = "";
+            showToast("Koneksi cloud diputus.", "warning");
+
+            initDatabaseConnection();
+            loadData();
+        }
+
+        function updateDashboardUI() {
+            document.getElementById('stat-total-items').innerText = inventory.length;
+            const capacityPercentage = Math.round((inventory.length / 60) * 100);
+            document.getElementById('stat-capacity-usage').innerText = capacityPercentage + '%';
+            
+            // Evaluasi barang kritis berdasarkan aturan penyesuaian baru
+            const lowStockItems = inventory.filter(item => item.quantity < item.min_stock);
+            document.getElementById('stat-low-stock').innerText = lowStockItems.length;
+
+            let totalValue = 0;
+            inventory.forEach(item => { totalValue += (item.quantity * item.price); });
+            document.getElementById('stat-total-value').innerText = formatRupiah(totalValue);
+
+            const alertContainer = document.getElementById('dashboard-stock-alerts');
+            alertContainer.innerHTML = '';
+            
+            if (lowStockItems.length === 0) {
+                alertContainer.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full text-slate-500 py-16">
+                        <i class="fa-regular fa-circle-check text-4xl mb-2 text-emerald-500 animate-pulse"></i>
+                        <p class="text-xs">Kondisi Aman! Tidak ada barang berstok kritis.</p>
+                    </div>`;
+            } else {
+                lowStockItems.slice(0, 5).forEach(item => {
+                    const isOutOfStock = item.quantity === 0;
+                    alertContainer.innerHTML += `
+                        <div class="flex items-center justify-between p-3 rounded-xl border ${isOutOfStock ? 'bg-rose-500/5 border-rose-500/20 text-rose-400' : 'bg-amber-500/5 border-amber-500/20 text-amber-400'}">
+                            <div class="min-w-0 flex-1">
+                                <p class="text-xs font-bold text-white truncate">${item.name}</p>
+                                <p class="text-[10px] text-slate-400">SKU: ${item.sku} | Rak: [B:${item.rack_row} K:${item.rack_col} L:${item.rack_level}]</p>
+                            </div>
+                            <div class="text-right ml-2 flex-shrink-0">
+                                <span class="inline-block text-[10px] font-bold px-2 py-1 rounded-md ${isOutOfStock ? 'bg-rose-500/20' : 'bg-amber-500/20'}">
+                                    ${isOutOfStock ? 'Habis' : item.quantity.toLocaleString('id-ID') + ' Unit'}
+                                </span>
+                            </div>
+                        </div>`;
+                });
+            }
+        }
+
+        function updateTableUI() {
+            const tbody = document.getElementById('inventory-table-body');
+            tbody.innerHTML = '';
+
+            if (inventory.length === 0) {
+                document.getElementById('table-empty-state').classList.remove('hidden');
+                return;
+            } else {
+                document.getElementById('table-empty-state').classList.add('hidden');
+            }
+
+            inventory.forEach(item => {
+                const isOutOfStock = item.quantity === 0;
+                const isLowStock = item.quantity < item.min_stock;
+                
+                let stockBadgeClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                let stockText = `${item.quantity.toLocaleString('id-ID')} Unit`;
+                if (isOutOfStock) {
+                    stockBadgeClass = 'bg-rose-500/10 text-rose-400 border-rose-500/20 animate-pulse';
+                    stockText = 'Habis';
+                } else if (isLowStock) {
+                    stockBadgeClass = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+                    stockText = `${item.quantity.toLocaleString('id-ID')} Unit (Kritis)`;
+                }
+
+                const buyPrice = item.price || 0;
+                const sellPrice = item.price_sell || 0;
+                const unitProfit = (sellPrice - buyPrice) * item.quantity;
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-800/40 transition-all border-b border-slate-800/40">
+                        <td class="px-6 py-4 font-mono text-xs font-bold text-indigo-400">${item.sku}</td>
+                        <td class="px-6 py-4 font-semibold text-slate-200">${item.name}</td>
+                        <td class="px-6 py-4 text-slate-400 text-xs">${item.category}</td>
+                        <td class="px-6 py-4 text-xs">
+                            <span class="inline-flex items-center px-2 py-1 rounded-md bg-slate-950 text-slate-300 font-semibold border border-slate-800">
+                                Baris ${item.rack_row} - Kolom ${item.rack_col} - Lantai ${item.rack_level}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-center font-mono text-xs text-slate-400">
+                            M: <span class="text-emerald-400 font-bold">${item.in_stock || 0}</span> / 
+                            K: <span class="text-rose-400 font-bold">${item.out_stock || 0}</span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="inline-block text-xs font-semibold px-2.5 py-1 rounded-full border ${stockBadgeClass}">
+                                ${stockText}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-right font-medium text-slate-300">${formatRupiah(buyPrice)}</td>
+                        <td class="px-6 py-4 text-right font-medium text-slate-300">${formatRupiah(sellPrice)}</td>
+                        <td class="px-6 py-4 text-right font-bold ${unitProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${formatRupiah(unitProfit)}</td>
+                        <td class="px-6 py-4 text-center">
+                            <div class="flex items-center justify-center space-x-2">
+                                <button onclick="openModal(${JSON.stringify(item).replace(/"/g, '&quot;')})" class="p-2 bg-indigo-500/10 hover:bg-indigo-600 hover:text-white text-indigo-400 rounded-lg transition" title="Edit Data">
+                                    <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                </button>
+                                <button onclick="deleteItem('${item.id}', '${item.name.replace(/'/g, "\\'")}')" class="p-2 bg-rose-500/10 hover:bg-rose-600 hover:text-white text-rose-400 rounded-lg transition" title="Hapus Barang">
+                                    <i class="fa-solid fa-trash-can text-xs"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        function filterItems() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            const catFilter = document.getElementById('filter-category-select').value;
+            const rows = document.querySelectorAll('#inventory-table-body tr');
+
+            rows.forEach((row, idx) => {
+                if (inventory.length === 0 || !inventory[idx]) return;
+                const item = inventory[idx];
+                const matchesSearch = item.name.toLowerCase().includes(query) || 
+                                      item.sku.toLowerCase().includes(query) || 
+                                      item.category.toLowerCase().includes(query);
+                const matchesCategory = (catFilter === 'all') || (item.category === catFilter);
+
+                if (matchesSearch && matchesCategory) {
+                    row.classList.remove('hidden');
+                } else {
+                    row.classList.add('hidden');
+                }
+            });
+        }
+
+        function populateCategoryFilter() {
+            const select = document.getElementById('filter-category-select');
+            const categories = [...new Set(inventory.map(item => item.category))];
+            const currentSel = select.value;
+            
+            select.innerHTML = '<option value="all">Semua Kategori</option>';
+            categories.forEach(cat => {
+                select.innerHTML += `<option value="${cat}">${cat}</option>`;
+            });
+
+            if (categories.includes(currentSel)) {
+                select.value = currentSel;
+            }
+        }
+
+        function switchTab(tabName) {
+            currentTab = tabName;
+            document.querySelectorAll('.tab-pane').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-content-${tabName}`).classList.remove('hidden');
+
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.className = "tab-btn w-full flex items-center space-x-3 px-3 py-3 rounded-xl transition duration-200 text-slate-400 hover:bg-slate-800 hover:text-slate-100";
+            });
+
+            const activeBtn = document.getElementById(`btn-${tabName}`);
+            activeBtn.className = "tab-btn w-full flex items-center space-x-3 px-3 py-3 rounded-xl transition duration-200 bg-indigo-600/10 text-indigo-400 border border-indigo-600/20";
+
+            if (tabName === 'warehouse3d') {
+                setTimeout(() => {
+                    init3D('threejs-main-canvas', 'main');
+                }, 100);
+            }
+        }
+
+        // ================= GRAPHICS THREE.JS 3D ENGINE =================
+        function init3D(containerId, mode) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            container.innerHTML = '';
+
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x070a13); 
+
+            const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(16, 12, 22);
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.05; 
+            controls.minDistance = 5;
+            controls.maxDistance = 45;
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.75);
+            dirLight.position.set(15, 30, 20);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            const gridHelper = new THREE.GridHelper(36, 36, 0x4f46e5, 0x1e293b);
+            gridHelper.position.y = 0;
+            scene.add(gridHelper);
+
+            buildWarehouseRacks(scene);
+            renderStockBoxes(scene, mode);
+
+            if (mode === 'main') {
+                activeScene = scene;
+                activeCamera = camera;
+                activeRenderer = renderer;
+                activeControls = controls;
+                renderer.domElement.addEventListener('pointerdown', onDocumentMouseDown, false);
+            } else {
+                dbScene = scene;
+                dbCamera = camera;
+                dbRenderer = renderer;
+                dbControls = controls;
+            }
+
+            let animate = function () {
+                requestAnimationFrame(animate);
+                controls.update();
+                renderer.render(scene, camera);
+            };
+            animate();
+        }
+
+        function buildWarehouseRacks(scene) {
+            const shelfMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x222d41, 
+                metalness: 0.9, 
+                roughness: 0.15 
+            });
+
+            const rowSpacing = 6;  
+            const colSpacing = 3;  
+            const levelHeight = 2.2; 
+
+            for (let r = 1; r <= 4; r++) {
+                const zPos = (r - 2.5) * rowSpacing;
+
+                for (let c = 1; c <= 5; c++) {
+                    const xPos = (c - 3) * colSpacing;
+
+                    const pillarGeo = new THREE.BoxGeometry(0.12, 7.2, 0.12);
+                    const pillars = [
+                        {x: xPos - colSpacing/2 + 0.1, z: zPos - 0.55},
+                        {x: xPos + colSpacing/2 - 0.1, z: zPos - 0.55},
+                        {x: xPos - colSpacing/2 + 0.1, z: zPos + 0.55},
+                        {x: xPos + colSpacing/2 - 0.1, z: zPos + 0.55}
+                    ];
+
+                    pillars.forEach(p => {
+                        const pillarMesh = new THREE.Mesh(pillarGeo, shelfMaterial);
+                        pillarMesh.position.set(p.x, 3.6, p.z);
+                        scene.add(pillarMesh);
+                    });
+
+                    const beamMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0x334155,
+                        roughness: 0.5
+                    });
+                    for (let lvl = 1; lvl <= 3; lvl++) {
+                        const boardGeo = new THREE.BoxGeometry(colSpacing - 0.2, 0.08, 1.1);
+                        const boardMesh = new THREE.Mesh(boardGeo, beamMaterial);
+                        boardMesh.position.set(xPos, lvl * levelHeight, zPos);
+                        scene.add(boardMesh);
+                    }
+                }
+            }
+        }
+
+        function renderStockBoxes(scene, mode) {
+            if (mode === 'main') {
+                boxesMap.clear();
+            }
+
+            const rowSpacing = 6;
+            const colSpacing = 3;
+            const levelHeight = 2.2;
+
+            inventory.forEach(item => {
+                if (mode === 'main') {
+                    if (filter3DMode === 'low' && item.quantity >= item.min_stock) return;
+                }
+
+                const z = (item.rack_row - 2.5) * rowSpacing; 
+                const x = (item.rack_col - 3) * colSpacing;
+                const y = (item.rack_level * levelHeight) + 0.52; 
+
+                const boxGeo = new THREE.BoxGeometry(1.2, 0.9, 0.8);
+                
+                // Aturan warna yang dimodifikasi sesuai permintaan
+                let boxColor = 0x10b981; // Hijau (Aman)
+                if (item.quantity === 0) {
+                    boxColor = 0xf43f5e; // Merah (Habis)
+                } else if (item.quantity < item.min_stock) {
+                    boxColor = 0xf59e0b; // Kuning (Kritis - Harus Reorder)
+                }
+
+                if (mode === 'main' && filter3DMode === 'category') {
+                    boxColor = generateCategoryColor(item.category);
+                }
+
+                const boxMaterial = new THREE.MeshStandardMaterial({
+                    color: boxColor,
+                    roughness: 0.45,
+                    metalness: 0.05,
+                    transparent: item.quantity === 0,
+                    opacity: item.quantity === 0 ? 0.3 : 1.0
+                });
+
+                const boxMesh = new THREE.Mesh(boxGeo, boxMaterial);
+                boxMesh.position.set(x, y, z);
+                boxMesh.castShadow = true;
+                boxMesh.receiveShadow = true;
+                
+                boxMesh.userData = { itemId: item.id };
+                scene.add(boxMesh);
+
+                if (mode === 'main') {
+                    boxesMap.set(item.id, boxMesh);
+                }
+            });
+        }
+
+        function sync3DVisualization() {
+            if (activeScene) {
+                const meshesToRemove = [];
+                activeScene.traverse(child => {
+                    if (child.isMesh && child.userData && child.userData.itemId) {
+                        meshesToRemove.push(child);
+                    }
+                });
+                meshesToRemove.forEach(mesh => activeScene.remove(mesh));
+                renderStockBoxes(activeScene, 'main');
+            }
+            if (dbScene) {
+                const meshesToRemove = [];
+                dbScene.traverse(child => {
+                    if (child.isMesh && child.userData && child.userData.itemId) {
+                        meshesToRemove.push(child);
+                    }
+                });
+                meshesToRemove.forEach(mesh => dbScene.remove(mesh));
+                renderStockBoxes(dbScene, 'db');
+            }
+        }
+
+        function onDocumentMouseDown(event) {
+            event.preventDefault();
+
+            const rect = activeRenderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, activeCamera);
+            const targets = Array.from(boxesMap.values());
+            const intersects = raycaster.intersectObjects(targets);
+
+            if (intersects.length > 0) {
+                const clickedMesh = intersects[0].object;
+                const itemId = clickedMesh.userData.itemId;
+                const selectedItem = inventory.find(item => String(item.id) === String(itemId));
+                
+                if (selectedItem) {
+                    const origColor = clickedMesh.material.color.getHex();
+                    clickedMesh.material.color.setHex(0xffffff);
+                    setTimeout(() => { clickedMesh.material.color.setHex(origColor); }, 220);
+                    displaySelectedItemDetails(selectedItem);
+                }
+            }
+        }
+
+        function displaySelectedItemDetails(item) {
+            const container = document.getElementById('selected-rack-info');
+            const isLow = item.quantity < item.min_stock;
+            const isOut = item.quantity === 0;
+
+            let statusLabel = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400">AMAN</span>';
+            if (isOut) {
+                statusLabel = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400">HABIS</span>';
+            } else if (isLow) {
+                statusLabel = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400">KRITIS (REORDER)</span>';
+            }
+
+            const buy = item.price || 0;
+            const sell = item.price_sell || 0;
+            const unitProfit = (sell - buy) * item.quantity;
+
+            container.innerHTML = `
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3.5 shadow-inner">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="text-[10px] font-mono font-bold text-indigo-400">${item.sku}</span>
+                            <h4 class="text-sm font-bold text-white mt-0.5">${item.name}</h4>
+                        </div>
+                        ${statusLabel}
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-xs text-slate-400">
+                        <div>
+                            <p class="text-[10px] text-slate-500">Kategori</p>
+                            <p class="font-medium text-slate-300 mt-0.5">${item.category}</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-slate-500">Nilai Aset (Beli)</p>
+                            <p class="font-medium text-indigo-400 mt-0.5">${formatRupiah(buy * item.quantity)}</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-1 text-[11px] text-slate-400 border-t border-slate-800/60 pt-2">
+                        <div>
+                            <p class="text-[9px] text-slate-500">Harga Beli</p>
+                            <p class="font-medium text-slate-300 mt-0.5">${formatRupiah(buy)}</p>
+                        </div>
+                        <div>
+                            <p class="text-[9px] text-slate-500">Harga Jual</p>
+                            <p class="font-medium text-slate-300 mt-0.5">${formatRupiah(sell)}</p>
+                        </div>
+                        <div>
+                            <p class="text-[9px] text-slate-500">Profit/Unit</p>
+                            <p class="font-bold ${unitProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'} mt-0.5">${formatRupiah(unitProfit)}</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-xs text-slate-400 border-t border-slate-800/60 pt-2">
+                        <div>
+                            <p class="text-[10px] text-slate-500">Barang Masuk</p>
+                            <p class="font-medium text-emerald-400 mt-0.5">${(item.in_stock || 0).toLocaleString('id-ID')}</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-slate-500">Barang Keluar</p>
+                            <p class="font-medium text-rose-400 mt-0.5">${(item.out_stock || 0).toLocaleString('id-ID')}</p>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-800/60 pt-3">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-400">Sisa Stok Saat Ini:</span>
+                            <span class="font-bold text-white">${item.quantity.toLocaleString('id-ID')} / ${item.min_stock.toLocaleString('id-ID')} Min</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-indigo-950/20 border border-indigo-500/10 p-2.5 rounded-lg">
+                        <p class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider mb-1"><i class="fa-solid fa-map-location-dot"></i> Koordinat Posisi:</p>
+                        <p class="text-xs text-slate-200">Baris (Row) <strong class="text-white">${item.rack_row}</strong>, Kolom <strong class="text-white">${item.rack_col}</strong>, Lantai <strong class="text-white">${item.rack_level}</strong></p>
+                    </div>
+                </div>
+
+                <div class="flex gap-2">
+                    <button onclick="openModal(${JSON.stringify(item).replace(/"/g, '&quot;')})" class="flex-1 bg-slate-800 hover:bg-slate-750 text-slate-200 py-2 rounded-xl text-xs font-semibold border border-slate-700 transition">
+                        <i class="fa-solid fa-pen-to-square mr-1"></i> Edit Data
+                    </button>
+                    <button onclick="deleteItem('${item.id}', '${item.name.replace(/'/g, "\\'")}')" class="bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-400 p-2 rounded-xl text-xs font-semibold border border-rose-500/20 transition">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            `;
+        }
+
+        function set3DFilter(filter) {
+            filter3DMode = filter;
+            document.querySelectorAll('.filter-3d-btn').forEach(btn => {
+                btn.className = "filter-3d-btn px-3 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200";
+            });
+            event.target.className = "filter-3d-btn px-3 py-1 text-xs font-semibold rounded-lg bg-indigo-600 text-white shadow";
+            sync3DVisualization();
+        }
+
+        // ================= SYSTEM UTILITIES =================
+        function generateCategoryColor(category) {
+            let hash = 0;
+            for (let i = 0; i < category.length; i++) { hash = category.charCodeAt(i) + ((hash << 5) - hash); }
+            const colors = [0x10b981, 0x3b82f6, 0x8b5cf6, 0xec4899, 0xf59e0b, 0x14b8a6, 0x06b6d4];
+            return colors[Math.abs(hash) % colors.length];
+        }
+
+        function formatRupiah(angka) {
+            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(angka);
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let bgClass = 'bg-slate-900 border-emerald-500/30 text-emerald-400';
+            let icon = '<i class="fa-solid fa-circle-check"></i>';
+            if (type === 'error') {
+                bgClass = 'bg-slate-900 border-rose-500/30 text-rose-400';
+                icon = '<i class="fa-solid fa-circle-xmark"></i>';
+            } else if (type === 'warning') {
+                bgClass = 'bg-slate-900 border-amber-500/30 text-amber-400';
+                icon = '<i class="fa-solid fa-triangle-exclamation"></i>';
+            }
+
+            toast.className = `flex items-center space-x-2.5 px-4 py-3 rounded-xl border ${bgClass} shadow-2xl transition duration-300 transform translate-y-2 opacity-0 pointer-events-auto max-w-sm`;
+            toast.innerHTML = `${icon} <span class="text-xs font-semibold text-slate-200">${message}</span>`;
+            
+            container.appendChild(toast);
+            setTimeout(() => { toast.classList.remove('translate-y-2', 'opacity-0'); }, 50);
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        let confirmCallback = null;
+        function openConfirm(msg, callback) {
+            confirmCallback = callback;
+            document.getElementById('confirm-message').innerHTML = msg;
+            
+            const modal = document.getElementById('confirm-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => { modal.classList.remove('opacity-0'); }, 50);
+        }
+
+        document.getElementById('confirm-cancel-btn').addEventListener('click', closeConfirm);
+        document.getElementById('confirm-ok-btn').addEventListener('click', () => {
+            if (confirmCallback) confirmCallback();
+            closeConfirm();
+        });
+
+        function closeConfirm() {
+            const modal = document.getElementById('confirm-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                confirmCallback = null;
+            }, 300);
+        }
+
+        function openModal(item = null) {
+            const modal = document.getElementById('item-modal');
+            const form = document.getElementById('item-form');
+            form.reset();
+
+            if (item) {
+                document.getElementById('modal-title').innerText = 'Edit Data Barang';
+                document.getElementById('form-id').value = item.id;
+                document.getElementById('form-sku').value = item.sku;
+                document.getElementById('form-sku').setAttribute('readonly', 'readonly');
+                document.getElementById('form-sku').classList.add('opacity-60', 'bg-slate-900');
+                document.getElementById('form-name').value = item.name;
+                document.getElementById('form-category').value = item.category;
+                document.getElementById('form-price').value = item.price;
+                document.getElementById('form-price-sell').value = item.price_sell || 0;
+                
+                // Isi form Masuk & Keluar saat edit data kargo
+                document.getElementById('form-in').value = item.in_stock || 0;
+                document.getElementById('form-out').value = item.out_stock || 0;
+                
+                document.getElementById('form-min-stock').value = item.min_stock;
+                document.getElementById('form-rack-row').value = item.rack_row;
+                document.getElementById('form-rack-col').value = item.rack_col;
+                document.getElementById('form-rack-level').value = item.rack_level;
+            } else {
+                document.getElementById('modal-title').innerText = 'Tambah Data Barang';
+                document.getElementById('form-id').value = '';
+                document.getElementById('form-sku').removeAttribute('readonly');
+                document.getElementById('form-sku').classList.remove('opacity-60', 'bg-slate-900');
+                
+                document.getElementById('form-in').value = 0;
+                document.getElementById('form-out').value = 0;
+                document.getElementById('form-min-stock').value = 212263;
+                document.getElementById('form-price-sell').value = 0;
+            }
+
+            calculateLiveStock();
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.querySelector('.transform').classList.remove('scale-95');
+            }, 50);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('item-modal');
+            modal.classList.add('opacity-0');
+            modal.querySelector('.transform').classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
+        }
+
+        function resetToDemoData() {
+            openConfirm('Apakah Anda yakin ingin menyetel ulang data lokal ke demo awal?', () => {
+                localStorage.setItem('nexus_items', JSON.stringify(defaultInventory));
+                showToast('Data demo lokal dipulihkan!', 'success');
+                loadData();
+            });
+        }
+
+        function clearAllData() {
+            openConfirm('Apakah Anda yakin ingin menghapus seluruh data barang lokal?', () => {
+                localStorage.setItem('nexus_items', JSON.stringify([]));
+                showToast('Seluruh data lokal dibersihkan!', 'success');
+                loadData();
+            });
+        }
+    </script>
+</body>
+</html>
